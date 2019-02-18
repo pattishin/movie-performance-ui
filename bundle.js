@@ -1,25 +1,111 @@
 (function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
-var idb = require('idb');
+"use strict";
 
-/**
+var idb = require("idb");
+
+var IdbConnection = function() {
+  return this.init();
+};
+
+IdbConnection.prototype = {
+  init: function() {
+    //check for support
+    if (!("indexedDB" in window)) {
+      console.log("This browser doesn't support IndexedDB");
+      return;
+    }
+
+    var storeName = "loaded-movies";
+    var dbPromise = idb
+      .openDb("movie-search-db", 1, function(db) {
+        if (!db.objectStoreNames.contains(storeName)) {
+          db.createObjectStore(storeName);
+        }
+      })
+      .catch(function(err) {
+        return err;
+      });
+
+    this.storeName = "loaded-movies";
+    this.connection = dbPromise;
+    this.fetchCachedQuery = this.fetchCachedQuery.bind(this);
+    this.cacheQuery = this.cacheQuery.bind(this);
+
+    return {
+      storeName: this.storeName,
+      connection: this.connection,
+      fetchCachedQuery: this.fetchCachedQuery,
+      cacheQuery: this.cacheQuery
+    };
+  },
+  fetchCachedQuery: function(query) {
+    return this.connection
+      .then(function(db) {
+        if (db.objectStoreNames.contains(this.storeName)) {
+          var tx = db.transaction(this.storeName, "readonly");
+          return tx.objectStore(this.storeName).get(query);
+        }
+        return Promise.resolve([]);
+      })
+      .catch(function(err) {
+        return err;
+      });
+  },
+  cacheQuery: function(query, movies) {
+    if (!movies) {
+      return Promise.resolve();
+    }
+
+    return this.connection
+      .then(function(db) {
+        if (db.objectStoreNames.contains(this.storeName)) {
+          var tx = db.transaction(this.storeName, "readwrite");
+
+          tx.objectStore(this.storeName).put(movies, query);
+          return tx.complete;
+        }
+        return Promise.resolve();
+      })
+      .catch(function(err) {
+        return err;
+      });
+  }
+};
+
+module.exports = IdbConnection;
+
+},{"idb":3}],2:[function(require,module,exports){
+"use strict";
+var IdbConnection = require("./idbConnection.js");
+var SearchBar = require("./searchBar.js");
+
+/**********************************************************************************************************************
  * @method displayMovies
  */
 function displayMovies(movies) {
-  var target = document.querySelector('.MovieSearch-movieList');
-  
+  var target = document.querySelector(".MovieSearch-movieList");
+
   resetMovies().then(function() {
     if (movies) {
       movies.forEach(function(movie, index) {
-        var movieInfo = movie.Title + ' ' + movie.Type + ' ' + movie.Year;
-        var newElement = document.createElement('div');
-        newElement.setAttribute('class', 'MovieSearch-movieItem');
-        newElement.innerHTML = '<img src="' + movie.Poster+ '" title="'+ movieInfo +'" alt="'+ movieInfo +'"/>';
+        var movieInfo = movie.Title + " " + movie.Type + " " + movie.Year;
+        var newElement = document.createElement("div");
+        newElement.setAttribute("class", "MovieSearch-movieItem");
+        newElement.innerHTML =
+          '<img src="' +
+          movie.Poster +
+          '" title="' +
+          movieInfo +
+          '" alt="' +
+          movieInfo +
+          '"/>';
         target.appendChild(newElement);
       });
     } else {
-      var emptyElement = document.createElement('div');
-      emptyElement.setAttribute('class', 'MovieSearch-noResults');
-      emptyElement.innerHTML = '<img src="./popcorn-movie-time_2.png" /><p>No movies found</p>';
+      var emptyElement = document.createElement("div");
+      emptyElement.setAttribute("class", "MovieSearch-noResults");
+      emptyElement.innerHTML =
+        '<img src="./popcorn-movie-time_2.png" /><p>No movies found</p>';
       target.appendChild(emptyElement);
     }
   });
@@ -29,9 +115,9 @@ function displayMovies(movies) {
  * @method resetMovies
  */
 function resetMovies() {
-  var target = document.querySelector('.MovieSearch-movieList');
+  var target = document.querySelector(".MovieSearch-movieList");
   return new Promise(function(resolve, reject) {
-    while(target.firstChild) {
+    while (target.firstChild) {
       target.removeChild(target.firstChild);
     }
     if (!target.firstChild) {
@@ -41,111 +127,16 @@ function resetMovies() {
 }
 
 /**
- * @method searchForMovie
- * @param query
- */
-function searchForMovie(database, query) {
-  var imdbAPI = 'http://www.omdbapi.com/?apikey=aba065d3&s=' + query;
-  
-  fetch(imdbAPI, { method: 'get' })
-    .then(function(response) {
-      return response.json(); 
-    })
-    .then(function(data) {
-      var movies = data.Search;
-      // Save to cache if not yet saved
-      cacheQuery(database, query, movies)
-      displayMovies(movies);
-    })
-    .catch(function(err) {
-      console.log(err);
-    });
-}
-
-/**
- * @method fetchCachedQuery
- */
-function fetchCachedQuery(database, query) {
-  return database.connection.then(function(db) { 
-    if (db.objectStoreNames.contains(database.storeName)) { 
-      var tx = db.transaction(database.storeName, 'readonly'); 
-      return tx.objectStore(database.storeName).get(query); 
-    }
-    return Promise.resolve([]);
-   })
-  .catch(function(err) { console.log(err);}); 
-}
-
-/**
- * @method cacheQuery
- * @param query
- * @param results
- */
-function cacheQuery(database, query, movies) {
-  if (!movies) {
-    return Promise.resolve(); 
-  }
-  
-  return database.connection.then(function(db) {
-    if (db.objectStoreNames.contains(database.storeName)) {
-      var tx = db.transaction(database.storeName, 'readwrite');
-        
-      tx.objectStore(database.storeName).put(movies, query);
-      return tx.complete;
-    }
-    return Promise.resolve();
-  })
-  .catch(function(err) {
-    console.log(err);
-  });
-}
-
-/**
- * @method createIdb
- */
-function createIdb() {
- //check for support
-  if (!('indexedDB' in window)) {
-    console.log('This browser doesn\'t support IndexedDB');
-    return;
-  }
-
-  var storeName = 'loaded-movies';
-  var dbPromise = idb.openDb('movie-search-db', 1, function(db) {
-    if (!db.objectStoreNames.contains(storeName)) {
-      db.createObjectStore(storeName);
-    }
-  })
-  .catch(function(err) {
-    console.log(err);
-  });
-
-  return {
-    storeName: storeName,
-    connection: dbPromise
-  };
-
-}
-
-/**
  * @method main
  */
 (function main() {
-  var search = document.getElementById('movieSearch');
-  var database = createIdb();
-
-  // Add debounce to the API calls 
-  search.addEventListener('search', function(response) {
-    var query = response.target.value;
-    var cached = fetchCachedQuery(database, query).then(function(results) { 
-      return results && results.length > 0
-        ? displayMovies(results)
-        : searchForMovie(database, query);
-    });
+  var database = new IdbConnection();
+  var searchBar = new SearchBar(database, function(results) {
+    displayMovies(results);
   });
-}());
+})();
 
-},{"idb":2}],2:[function(require,module,exports){
+},{"./idbConnection.js":1,"./searchBar.js":4}],3:[function(require,module,exports){
 (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
   typeof define === 'function' && define.amd ? define(['exports'], factory) :
@@ -463,4 +454,56 @@ function createIdb() {
 
 }));
 
-},{}]},{},[1]);
+},{}],4:[function(require,module,exports){
+"use strict";
+
+var SearchBar = function(database, onFetchQuery) {
+  this.init();
+  this.database = database;
+  this.onFetchQuery = onFetchQuery;
+};
+
+SearchBar.prototype = {
+  init: function() {
+    var self = this;
+    var search = document.getElementById("movieSearch");
+    // Add debounce to the API calls
+    search.addEventListener("search", function(response) {
+      var query = response.target.value;
+      if (self.database) {
+        self.database.fetchCachedQuery(query).then(function(results) {
+          return results && results.length > 0
+            ? self.onFetchQuery(results)
+            : self.searchForMovie(query);
+        });
+      } else {
+        debugger;
+        self.searchForMovie(query);
+      }
+    });
+  },
+  searchForMovie(query) {
+    var self = this;
+    var imdbAPI = "http://www.omdbapi.com/?apikey=aba065d3&s=" + query;
+
+    return fetch(imdbAPI, { method: "get" })
+      .then(function(response) {
+        return response.json();
+      })
+      .then(function(data) {
+        var movies = data.Search;
+        // Save to cache if not yet saved
+        if (self.database) {
+          self.database.cacheQuery(query, movies);
+        }
+        self.onFetchQuery(movies);
+      })
+      .catch(function(err) {
+        return err;
+      });
+  }
+};
+
+module.exports = SearchBar;
+
+},{}]},{},[2]);
