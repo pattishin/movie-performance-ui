@@ -4,6 +4,15 @@ var IdbConnection = require("./idbConnection.js");
 var SearchBar = require("./searchBar.js");
 var MovieList = require("./movieList.js");
 
+// Polyfilling promises and fetch for
+// older browsers
+var Promise = require("promise-polyfill");
+require("whatwg-fetch");
+
+if (!window.Promise) {
+  window.Promise = Promise;
+}
+
 /**
  * @method main
  * @description Initializes movie search application

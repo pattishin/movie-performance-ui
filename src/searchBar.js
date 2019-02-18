@@ -51,7 +51,7 @@ SearchBar.prototype = {
    * @description Fetch movies for given query that
    * hasn't been cached yet
    */
-  searchForMovie(query) {
+  searchForMovie: function(query) {
     var self = this;
 
     // Filter input query
