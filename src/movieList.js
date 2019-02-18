@@ -55,7 +55,7 @@ MovieList.prototype = {
         var noResults = document.createElement("div");
         noResults.setAttribute("class", "MovieSearch-noResults");
         noResults.innerHTML =
-          '<img src="./popcorn-movie-time_2.png" /><p>No movies found</p>';
+          '<img src="./img/popcorn-movie-time-2.png" /><p>No movies found</p>';
         movieTotal.innerHTML = "";
         movieList.appendChild(noResults);
       }

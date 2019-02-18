@@ -1,184 +1,4 @@
 (function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
-"use strict";
-
-var idb = require("idb");
-
-var IdbConnection = function() {
-  this.storeName = "loaded-movies";
-  return this.init();
-};
-
-IdbConnection.prototype = {
-  init: function() {
-    //check for support
-    if (!("indexedDB" in window)) {
-      console.log("This browser doesn't support IndexedDB");
-      return;
-    }
-
-    var self = this;
-    var dbPromise = idb
-      .openDb("movie-search-db", 1, function(db) {
-        if (!db.objectStoreNames.contains(self.storeName)) {
-          db.createObjectStore(self.storeName);
-        }
-      })
-      .catch(function(err) {
-        return err;
-      });
-
-    this.connection = dbPromise;
-    this.fetchCachedQuery = this.fetchCachedQuery.bind(this);
-    this.cacheQuery = this.cacheQuery.bind(this);
-
-    return {
-      storeName: this.storeName,
-      connection: this.connection,
-      cacheQuery: this.cacheQuery,
-      fetchCachedQuery: this.fetchCachedQuery
-    };
-  },
-  fetchCachedQuery: function(query) {
-    if (!query) {
-      return Promise.resolve();
-    }
-
-    var self = this;
-    return this.connection
-      .then(function(db) {
-        if (db.objectStoreNames.contains(self.storeName)) {
-          var tx = db.transaction(self.storeName, "readonly");
-          return tx.objectStore(self.storeName).get(query);
-        }
-        return Promise.resolve([]);
-      })
-      .catch(function(err) {
-        return err;
-      });
-  },
-  cacheQuery: function(query, movies) {
-    if (!movies || !query) {
-      return Promise.resolve();
-    }
-
-    var self = this;
-    return this.connection
-      .then(function(db) {
-        if (db.objectStoreNames.contains(self.storeName)) {
-          var tx = db.transaction(self.storeName, "readwrite");
-          tx.objectStore(self.storeName).put(movies, query);
-          return tx.complete;
-        }
-        return Promise.resolve();
-      })
-      .catch(function(err) {
-        return err;
-      });
-  }
-};
-
-module.exports = IdbConnection;
-
-},{"idb":4}],2:[function(require,module,exports){
-"use strict";
-
-var IdbConnection = require("./idbConnection.js");
-var SearchBar = require("./searchBar.js");
-var MovieList = require("./movieList.js");
-
-/*function debounce(func, wait) {
-  var timeout;
-  return function() {
-    var context = this,
-      args = arguments;
-    var later = function() {
-      timeout = null;
-    };
-    var callNow = !timeout;
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-    if (callNow) func.apply(context, args);
-  };
-}*/
-
-/**
- * @method main
- */
-(function main() {
-  var database = new IdbConnection();
-  var movieList = new MovieList();
-  var searchBar = new SearchBar(database, function(results) {
-    movieList.displayList(results);
-  });
-})();
-
-},{"./idbConnection.js":1,"./movieList.js":3,"./searchBar.js":6}],3:[function(require,module,exports){
-"use strict";
-
-var MovieList = function() {
-  return this.init();
-};
-
-MovieList.prototype = {
-  init: function(movies) {
-    this.displayList = this.displayList.bind(this);
-    this.resetList = this.resetList.bind(this);
-
-    return {
-      displayList: this.displayList,
-      resetList: this.resetList
-    };
-  },
-  displayList: function(results) {
-    var movieList = document.querySelector(".MovieSearch-movieList");
-    var movieTotal = document.querySelector(".MovieSearch-total");
-
-    this.resetList().then(function() {
-      if (results && !results.error) {
-        movieTotal.innerHTML = "<p>" + results.length + " found</p>";
-        results.forEach(function(movie, index) {
-          var movieInfo = movie.Title + " " + movie.Type + " " + movie.Year;
-          var movieItem = document.createElement("div");
-          movieItem.setAttribute("class", "MovieSearch-movieItem");
-
-          movieItem.innerHTML =
-            '<img src="' +
-            movie.Poster +
-            '" title="' +
-            movieInfo +
-            '" alt="' +
-            movieInfo +
-            '"/>';
-
-          movieList.appendChild(movieItem);
-        });
-      } else {
-        var noResults = document.createElement("div");
-        noResults.setAttribute("class", "MovieSearch-noResults");
-        noResults.innerHTML =
-          '<img src="./popcorn-movie-time_2.png" /><p>No movies found</p>';
-        movieTotal.innerHTML = "";
-        movieList.appendChild(noResults);
-      }
-    });
-  },
-  resetList: function() {
-    var target = document.querySelector(".MovieSearch-movieList");
-
-    return new Promise(function(resolve, reject) {
-      while (target.firstChild) {
-        target.removeChild(target.firstChild);
-      }
-      if (!target.firstChild) {
-        return resolve();
-      }
-    });
-  }
-};
-
-module.exports = MovieList;
-
-},{}],4:[function(require,module,exports){
 (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
   typeof define === 'function' && define.amd ? define(['exports'], factory) :
@@ -496,7 +316,7 @@ module.exports = MovieList;
 
 }));
 
-},{}],5:[function(require,module,exports){
+},{}],2:[function(require,module,exports){
 (function (global){
 /**
  * @license
@@ -17607,10 +17427,229 @@ module.exports = MovieList;
 }.call(this));
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{}],3:[function(require,module,exports){
+"use strict";
+
+var idb = require("idb");
+
+/**
+ * @module IdbConnection
+ * @description Module to create connection
+ * with browser IndexedDB
+ */
+var IdbConnection = function() {
+  this.storeName = "loaded-movies";
+  return this.init();
+};
+
+IdbConnection.prototype = {
+  /**
+   * @method init
+   * @description Opens connection with IndexedDB
+   * and initializes available functions in module
+   */
+  init: function() {
+    //check for support
+    if (!("indexedDB" in window)) {
+      console.log("This browser doesn't support IndexedDB");
+      return;
+    }
+
+    var self = this;
+    var dbPromise = idb
+      .openDb("movie-search-db", 1, function(db) {
+        if (!db.objectStoreNames.contains(self.storeName)) {
+          db.createObjectStore(self.storeName);
+        }
+      })
+      .catch(function(err) {
+        return err;
+      });
+
+    this.connection = dbPromise;
+    this.fetchCachedQuery = this.fetchCachedQuery.bind(this);
+    this.cacheQuery = this.cacheQuery.bind(this);
+
+    return {
+      storeName: this.storeName,
+      connection: this.connection,
+      cacheQuery: this.cacheQuery,
+      fetchCachedQuery: this.fetchCachedQuery
+    };
+  },
+
+  /**
+   * @method fetchCachedQuery
+   * @param query
+   * @method Retrieves results that match cached
+   * query to limit multiple api calls
+   */
+  fetchCachedQuery: function(query) {
+    if (!query) {
+      return Promise.resolve();
+    }
+
+    var self = this;
+    return this.connection
+      .then(function(db) {
+        if (db.objectStoreNames.contains(self.storeName)) {
+          var tx = db.transaction(self.storeName, "readonly");
+          return tx.objectStore(self.storeName).get(query);
+        }
+        return Promise.resolve([]);
+      })
+      .catch(function(err) {
+        return err;
+      });
+  },
+
+  /**
+   * @method cacheQuery
+   * @param query
+   * @param movies
+   * @description Save given query & associated
+   * movie results into IndexedDB
+   */
+  cacheQuery: function(query, movies) {
+    if (!movies || !query) {
+      return Promise.resolve();
+    }
+
+    var self = this;
+    return this.connection
+      .then(function(db) {
+        if (db.objectStoreNames.contains(self.storeName)) {
+          var tx = db.transaction(self.storeName, "readwrite");
+          tx.objectStore(self.storeName).put(movies, query);
+          return tx.complete;
+        }
+        return Promise.resolve();
+      })
+      .catch(function(err) {
+        return err;
+      });
+  }
+};
+
+module.exports = IdbConnection;
+
+},{"idb":1}],4:[function(require,module,exports){
+"use strict";
+
+var IdbConnection = require("./idbConnection.js");
+var SearchBar = require("./searchBar.js");
+var MovieList = require("./movieList.js");
+
+/**
+ * @method main
+ * @description Initializes movie search application
+ * creating a connection to IndexDB, a movie poster list,
+ * and search bar
+ */
+(function main() {
+  var database = new IdbConnection();
+  var movieList = new MovieList();
+  var searchBar = new SearchBar(database, function(results) {
+    movieList.displayList(results);
+  });
+})();
+
+},{"./idbConnection.js":3,"./movieList.js":5,"./searchBar.js":6}],5:[function(require,module,exports){
+"use strict";
+/**
+ * @module MovieList
+ * @description Displays given movie list
+ */
+var MovieList = function() {
+  return this.init();
+};
+
+MovieList.prototype = {
+  /**
+   * @method init
+   * @param movies
+   * @description Initializing available functions
+   */
+  init: function(movies) {
+    this.displayList = this.displayList.bind(this);
+    this.resetList = this.resetList.bind(this);
+
+    return {
+      displayList: this.displayList,
+      resetList: this.resetList
+    };
+  },
+  /**
+   * @method displayList
+   * @param results
+   * @description Inject into DOM list of given movie results
+   * or displays no results prompt if none are passed
+   */
+  displayList: function(results) {
+    var movieList = document.querySelector(".MovieSearch-movieList");
+    var movieTotal = document.querySelector(".MovieSearch-total");
+
+    this.resetList().then(function() {
+      if (results && !results.error) {
+        movieTotal.innerHTML = "<p>" + results.length + " found</p>";
+        results.forEach(function(movie, index) {
+          var movieInfo = movie.Title + " " + movie.Type + " " + movie.Year;
+          var movieItem = document.createElement("div");
+          movieItem.setAttribute("class", "MovieSearch-movieItem");
+
+          movieItem.innerHTML =
+            '<img src="' +
+            movie.Poster +
+            '" title="' +
+            movieInfo +
+            '" alt="' +
+            movieInfo +
+            '"/>';
+
+          movieList.appendChild(movieItem);
+        });
+      } else {
+        var noResults = document.createElement("div");
+        noResults.setAttribute("class", "MovieSearch-noResults");
+        noResults.innerHTML =
+          '<img src="./popcorn-movie-time_2.png" /><p>No movies found</p>';
+        movieTotal.innerHTML = "";
+        movieList.appendChild(noResults);
+      }
+    });
+  },
+  /**
+   * @method resetList
+   * @description Removes node children (movie items) from
+   * target parent (movie list)
+   */
+  resetList: function() {
+    var target = document.querySelector(".MovieSearch-movieList");
+
+    return new Promise(function(resolve, reject) {
+      while (target.firstChild) {
+        target.removeChild(target.firstChild);
+      }
+      if (!target.firstChild) {
+        return resolve();
+      }
+    });
+  }
+};
+
+module.exports = MovieList;
+
 },{}],6:[function(require,module,exports){
 "use strict";
+
 var _ = require("lodash");
 
+/**
+ * @module SearchBar
+ * @param database
+ * @param onFetchQuery
+ * @description Search input for movie search application
+ */
 var SearchBar = function(database, onFetchQuery) {
   this.init();
   this.database = database;
@@ -17618,25 +17657,36 @@ var SearchBar = function(database, onFetchQuery) {
 };
 
 SearchBar.prototype = {
+  /**
+   * @method init
+   * @description Initialize event listener for search
+   * input and wrap it with a debouncer to limit
+   * number of api hits
+   */
   init: function() {
     var self = this;
     var search = document.getElementById("movieSearch");
     var handleSearch = _.debounce(function(response) {
       var query = response.target.value;
-      self.database.fetchCachedQuery(query).then(function(results) {
+      var cachedQuery = self.database.fetchCachedQuery(query);
+      cachedQuery.then(function(results) {
         return results && results.length > 0
           ? self.onFetchQuery(results)
           : self.searchForMovie(query);
       });
-    }, 300);
+    }, 250);
 
-    //search.addEventListener("keydown", processEvent);
     search.addEventListener("keydown", handleSearch);
   },
+  /**
+   * @method searchForMovie
+   * @param query
+   * @description Fetch movies for uncached query
+   */
   searchForMovie(query) {
     var self = this;
-    var regexp = new RegExp("[0-9A-Za-z]");
 
+    var regexp = new RegExp("[0-9A-Za-z]");
     if (!regexp.test(query)) {
       return Promise.resolve({
         error: "Please enter only letters and numbers"
@@ -17651,7 +17701,6 @@ SearchBar.prototype = {
       })
       .then(function(data) {
         if (data && data.Search) {
-          debugger;
           var movies = _.filter(data.Search, function(movie) {
             return movie.Poster !== "N/A";
           });
@@ -17668,4 +17717,4 @@ SearchBar.prototype = {
 
 module.exports = SearchBar;
 
-},{"lodash":5}]},{},[2]);
+},{"lodash":2}]},{},[4]);
