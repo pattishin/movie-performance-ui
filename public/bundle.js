@@ -17612,7 +17612,7 @@ MovieList.prototype = {
         var noResults = document.createElement("div");
         noResults.setAttribute("class", "MovieSearch-noResults");
         noResults.innerHTML =
-          '<img src="./popcorn-movie-time_2.png" /><p>No movies found</p>';
+          '<img src="./img/popcorn-movie-time-2.png" /><p>No movies found</p>';
         movieTotal.innerHTML = "";
         movieList.appendChild(noResults);
       }
@@ -17665,7 +17665,7 @@ SearchBar.prototype = {
    */
   init: function() {
     var self = this;
-    var search = document.getElementById("movieSearch");
+    var search = document.getElementById("MovieSearch-searchInput");
     var handleSearch = _.debounce(function(response) {
       var query = response.target.value;
       var cachedQuery = self.database.fetchCachedQuery(query);

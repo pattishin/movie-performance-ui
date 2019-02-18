@@ -23,7 +23,7 @@ SearchBar.prototype = {
    */
   init: function() {
     var self = this;
-    var search = document.getElementById("movieSearch");
+    var search = document.getElementById("MovieSearch-searchInput");
     var handleSearch = _.debounce(function(response) {
       var query = response.target.value;
       var cachedQuery = self.database.fetchCachedQuery(query);

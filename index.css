@@ -24,11 +24,28 @@ body {
   display: block;
   margin: 20px auto;
   width: auto;
-  max-width: calc(1150px + 25vmin);
+  max-width: calc(1050px + 15vmin);
 }
 
+/* Search Bar */
 .MovieSearch-searchBar {
   padding: 15px;
+}
+
+.MovieSearch-searchInput {
+  display: block;
+  padding: 10px;
+  width: 70%;
+  border-radius: 3px;
+  border: 0;
+  margin: 5px auto;
+}
+
+/* Movie List */
+
+.MovieSearch-total {
+  font-size: 20px;
+  text-align: center;
 }
 
 .MovieSearch-movieList {
@@ -36,16 +53,34 @@ body {
   width: inherit;
 }
 
-.MovieSearch-noResults {
-  font-weight: 500;
-  font-size: 14px;
-}
-
 .MovieSearch-movieList .initial {
   display: block;
   margin: auto;
-  width: calc(450px + 1vmin);
-  opacity: 0.3;
+  width: 100%;
+  max-width: 450px;
+  opacity: 0.15;
+}
+
+.MovieSearch-movieItem {
+  display: inline-block;
+  margin: 15px;
+  width: auto;
+  height: calc(220px + 5vmin);
+}
+
+.MovieSearch-movieItem img {
+  display: block;
+  margin: auto;
+  height: 100%;
+  border: 1px solid #dcdcdc;
+  box-shadow: rgba(0, 0, 0, 0.2) 0 2px 6px;
+}
+
+/* Movie List (empty)*/
+
+.MovieSearch-noResults {
+  font-weight: 500;
+  font-size: 14px;
 }
 
 .MovieSearch-noResults img {
@@ -60,46 +95,19 @@ body {
   font-size: 35px;
 }
 
-.MovieSearch-movieItem {
-  display: inline-block;
-  border: 1px solid #ededed;
-  margin: 10px;
-  max-width: calc(140px + 7vmin);
-  min-width: calc(100px + 7vmax);
-  width: 100%;
-}
-
-.MovieSearch-total {
-  margin: 0 10px;
-  font-size: 20px;
-}
-
-.MovieSearch-movieItem img {
-  width: 100%;
-  display: block;
-}
-
-.movieSearch {
-  padding: 10px;
-  width: 50%;
-  border-radius: 3px;
-  border: 0;
-  margin: auto;
-  display: block;
-}
-
-@media (max-width: 750px), (max-height: 450px) {
-  .movieSearch {
-    width: 70%;
+@media only screen and (min-width: 749px) {
+  .MovieSearch-movieItem {
+    width: 20%;
   }
 }
-@media (max-width: 450px), (max-height: 350px) {
-  .movieSearch {
-    width: 100%;
+
+@media only screen and (max-width: 750px) {
+  .MovieSearch-movieItem {
+    width: 30%;
   }
 }
-@media (max-width: 280px), (max-height: 250px) {
-  .movieSearch {
-    width: 100%;
+@media only screen and (max-width: 450px) {
+  .MovieSearch-movieItem {
+    width: 40%;
   }
 }
