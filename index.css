@@ -2,7 +2,7 @@ html,
 body {
   width: 100%;
   height: 100%;
-  font-family: 'Source Sans';
+  font-family: "Source Sans";
   margin: 0;
 }
 
@@ -35,7 +35,6 @@ body {
   display: block;
   width: inherit;
 }
-
 
 .MovieSearch-noResults {
   font-weight: 500;
@@ -70,6 +69,11 @@ body {
   width: 100%;
 }
 
+.MovieSearch-total {
+  margin: 0 10px;
+  font-size: 20px;
+}
+
 .MovieSearch-movieItem img {
   width: 100%;
   display: block;
@@ -84,8 +88,18 @@ body {
   display: block;
 }
 
-
-@media (max-width: 750px), (max-height: 450px) { .movieSearch { width: 70%; } }
-@media (max-width: 450px), (max-height: 350px) { .movieSearch { width: 100%; } }
-@media (max-width: 280px), (max-height: 250px) { .movieSearch { width: 100%; }}
-
+@media (max-width: 750px), (max-height: 450px) {
+  .movieSearch {
+    width: 70%;
+  }
+}
+@media (max-width: 450px), (max-height: 350px) {
+  .movieSearch {
+    width: 100%;
+  }
+}
+@media (max-width: 280px), (max-height: 250px) {
+  .movieSearch {
+    width: 100%;
+  }
+}

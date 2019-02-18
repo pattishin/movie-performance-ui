@@ -2,11 +2,22 @@
 
 var idb = require("idb");
 
+/**
+ * @module IdbConnection
+ * @description Module to create connection
+ * with browser IndexedDB
+ */
 var IdbConnection = function() {
+  this.storeName = "loaded-movies";
   return this.init();
 };
 
 IdbConnection.prototype = {
+  /**
+   * @method init
+   * @description Opens connection with IndexedDB
+   * and initializes available functions in module
+   */
   init: function() {
     //check for support
     if (!("indexedDB" in window)) {
@@ -14,18 +25,17 @@ IdbConnection.prototype = {
       return;
     }
 
-    var storeName = "loaded-movies";
+    var self = this;
     var dbPromise = idb
       .openDb("movie-search-db", 1, function(db) {
-        if (!db.objectStoreNames.contains(storeName)) {
-          db.createObjectStore(storeName);
+        if (!db.objectStoreNames.contains(self.storeName)) {
+          db.createObjectStore(self.storeName);
         }
       })
       .catch(function(err) {
         return err;
       });
 
-    this.storeName = "loaded-movies";
     this.connection = dbPromise;
     this.fetchCachedQuery = this.fetchCachedQuery.bind(this);
     this.cacheQuery = this.cacheQuery.bind(this);
@@ -33,16 +43,28 @@ IdbConnection.prototype = {
     return {
       storeName: this.storeName,
       connection: this.connection,
-      fetchCachedQuery: this.fetchCachedQuery,
-      cacheQuery: this.cacheQuery
+      cacheQuery: this.cacheQuery,
+      fetchCachedQuery: this.fetchCachedQuery
     };
   },
+
+  /**
+   * @method fetchCachedQuery
+   * @param query
+   * @method Retrieves results that match cached
+   * query to limit multiple api calls
+   */
   fetchCachedQuery: function(query) {
+    if (!query) {
+      return Promise.resolve();
+    }
+
+    var self = this;
     return this.connection
       .then(function(db) {
-        if (db.objectStoreNames.contains(this.storeName)) {
-          var tx = db.transaction(this.storeName, "readonly");
-          return tx.objectStore(this.storeName).get(query);
+        if (db.objectStoreNames.contains(self.storeName)) {
+          var tx = db.transaction(self.storeName, "readonly");
+          return tx.objectStore(self.storeName).get(query);
         }
         return Promise.resolve([]);
       })
@@ -50,17 +72,25 @@ IdbConnection.prototype = {
         return err;
       });
   },
+
+  /**
+   * @method cacheQuery
+   * @param query
+   * @param movies
+   * @description Save given query & associated
+   * movie results into IndexedDB
+   */
   cacheQuery: function(query, movies) {
-    if (!movies) {
+    if (!movies || !query) {
       return Promise.resolve();
     }
 
+    var self = this;
     return this.connection
       .then(function(db) {
-        if (db.objectStoreNames.contains(this.storeName)) {
-          var tx = db.transaction(this.storeName, "readwrite");
-
-          tx.objectStore(this.storeName).put(movies, query);
+        if (db.objectStoreNames.contains(self.storeName)) {
+          var tx = db.transaction(self.storeName, "readwrite");
+          tx.objectStore(self.storeName).put(movies, query);
           return tx.complete;
         }
         return Promise.resolve();

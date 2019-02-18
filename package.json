@@ -12,6 +12,7 @@
   "devDependencies": {},
   "dependencies": {
     "browserify": "^16.2.3",
-    "idb": "^3.0.2"
+    "idb": "^3.0.2",
+    "lodash": "^4.17.11"
   }
 }
