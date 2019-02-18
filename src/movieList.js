@@ -24,16 +24,17 @@ MovieList.prototype = {
   },
   /**
    * @method displayList
+   * @param query
    * @param results
    * @description Inject into DOM list of given movie results
    * or displays no results prompt if none are passed
    */
-  displayList: function(results) {
+  displayList: function(query, results) {
     var movieList = document.querySelector(".MovieSearch-movieList");
     var movieTotal = document.querySelector(".MovieSearch-total");
 
     this.resetList().then(function() {
-      if (results && !results.error) {
+      if (results && !results.error && query !== "") {
         movieTotal.innerHTML = "<p>" + results.length + " found</p>";
         results.forEach(function(movie, index) {
           var movieInfo = movie.Title + " " + movie.Type + " " + movie.Year;

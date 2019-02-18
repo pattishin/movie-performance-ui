@@ -13,7 +13,7 @@ var MovieList = require("./movieList.js");
 (function main() {
   var database = new IdbConnection();
   var movieList = new MovieList();
-  var searchBar = new SearchBar(database, function(results) {
-    movieList.displayList(results);
+  var searchBar = new SearchBar(database, function(query, results) {
+    movieList.displayList(query, results);
   });
 })();

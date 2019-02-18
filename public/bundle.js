@@ -17428,6 +17428,32 @@
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 },{}],3:[function(require,module,exports){
+/**
+ * Modified debounce function from
+ * https://davidwalsh.name/javascript-debounce-function
+ * @helper debounce
+ * @param func
+ * @param wait
+ */
+function debounce(func, wait) {
+  var timeout;
+
+  return function() {
+    var context = this,
+      args = arguments;
+    var later = function() {
+      timeout = null;
+      func.apply(context, args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+    if (!timeout) func.apply(context, args);
+  };
+}
+
+module.exports = debounce;
+
+},{}],4:[function(require,module,exports){
 "use strict";
 
 var idb = require("idb");
@@ -17533,7 +17559,7 @@ IdbConnection.prototype = {
 
 module.exports = IdbConnection;
 
-},{"idb":1}],4:[function(require,module,exports){
+},{"idb":1}],5:[function(require,module,exports){
 "use strict";
 
 var IdbConnection = require("./idbConnection.js");
@@ -17549,12 +17575,12 @@ var MovieList = require("./movieList.js");
 (function main() {
   var database = new IdbConnection();
   var movieList = new MovieList();
-  var searchBar = new SearchBar(database, function(results) {
-    movieList.displayList(results);
+  var searchBar = new SearchBar(database, function(query, results) {
+    movieList.displayList(query, results);
   });
 })();
 
-},{"./idbConnection.js":3,"./movieList.js":5,"./searchBar.js":6}],5:[function(require,module,exports){
+},{"./idbConnection.js":4,"./movieList.js":6,"./searchBar.js":7}],6:[function(require,module,exports){
 "use strict";
 /**
  * @module MovieList
@@ -17581,16 +17607,17 @@ MovieList.prototype = {
   },
   /**
    * @method displayList
+   * @param query
    * @param results
    * @description Inject into DOM list of given movie results
    * or displays no results prompt if none are passed
    */
-  displayList: function(results) {
+  displayList: function(query, results) {
     var movieList = document.querySelector(".MovieSearch-movieList");
     var movieTotal = document.querySelector(".MovieSearch-total");
 
     this.resetList().then(function() {
-      if (results && !results.error) {
+      if (results && !results.error && query !== "") {
         movieTotal.innerHTML = "<p>" + results.length + " found</p>";
         results.forEach(function(movie, index) {
           var movieInfo = movie.Title + " " + movie.Type + " " + movie.Year;
@@ -17639,10 +17666,11 @@ MovieList.prototype = {
 
 module.exports = MovieList;
 
-},{}],6:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
 "use strict";
 
 var _ = require("lodash");
+var debounce = require("./helpers.js");
 
 /**
  * @module SearchBar
@@ -17666,26 +17694,37 @@ SearchBar.prototype = {
   init: function() {
     var self = this;
     var search = document.getElementById("MovieSearch-searchInput");
-    var handleSearch = _.debounce(function(response) {
+    var handleSearch = debounce(function(response) {
       var query = response.target.value;
       var cachedQuery = self.database.fetchCachedQuery(query);
+
+      if (query === "") {
+        self.onFetchQuery(query);
+        return;
+      }
+
+      // Either uses cached movie data to serve up if available
+      // or hits the omdb api to retrieve related movies
       cachedQuery.then(function(results) {
         return results && results.length > 0
-          ? self.onFetchQuery(results)
+          ? self.onFetchQuery(query, results)
           : self.searchForMovie(query);
       });
-    }, 250);
+    }, 300);
 
     search.addEventListener("keydown", handleSearch);
+    search.addEventListener("search", handleSearch);
   },
   /**
    * @method searchForMovie
    * @param query
-   * @description Fetch movies for uncached query
+   * @description Fetch movies for given query that
+   * hasn't been cached yet
    */
   searchForMovie(query) {
     var self = this;
 
+    // Filter input query
     var regexp = new RegExp("[0-9A-Za-z]");
     if (!regexp.test(query)) {
       return Promise.resolve({
@@ -17701,12 +17740,12 @@ SearchBar.prototype = {
       })
       .then(function(data) {
         if (data && data.Search) {
-          var movies = _.filter(data.Search, function(movie) {
-            return movie.Poster !== "N/A";
+          var movies = data.Search.filter(function(movie) {
+            return movie && movie.Poster && movie.Poster !== "N/A";
           });
           // Save to cache if not yet saved
           self.database.cacheQuery(query, movies);
-          self.onFetchQuery(movies);
+          self.onFetchQuery(query, movies);
         }
       })
       .catch(function(err) {
@@ -17717,4 +17756,4 @@ SearchBar.prototype = {
 
 module.exports = SearchBar;
 
-},{"lodash":2}]},{},[4]);
+},{"./helpers.js":3,"lodash":2}]},{},[5]);

@@ -1,6 +1,6 @@
 "use strict";
 
-var _ = require("lodash");
+var debounce = require("./helpers.js");
 
 /**
  * @module SearchBar
@@ -24,26 +24,37 @@ SearchBar.prototype = {
   init: function() {
     var self = this;
     var search = document.getElementById("MovieSearch-searchInput");
-    var handleSearch = _.debounce(function(response) {
+    var handleSearch = debounce(function(response) {
       var query = response.target.value;
       var cachedQuery = self.database.fetchCachedQuery(query);
+
+      if (query === "") {
+        self.onFetchQuery(query);
+        return;
+      }
+
+      // Either uses cached movie data to serve up if available
+      // or hits the omdb api to retrieve related movies
       cachedQuery.then(function(results) {
         return results && results.length > 0
-          ? self.onFetchQuery(results)
+          ? self.onFetchQuery(query, results)
           : self.searchForMovie(query);
       });
-    }, 250);
+    }, 300);
 
     search.addEventListener("keydown", handleSearch);
+    search.addEventListener("search", handleSearch);
   },
   /**
    * @method searchForMovie
    * @param query
-   * @description Fetch movies for uncached query
+   * @description Fetch movies for given query that
+   * hasn't been cached yet
    */
   searchForMovie(query) {
     var self = this;
 
+    // Filter input query
     var regexp = new RegExp("[0-9A-Za-z]");
     if (!regexp.test(query)) {
       return Promise.resolve({
@@ -59,12 +70,12 @@ SearchBar.prototype = {
       })
       .then(function(data) {
         if (data && data.Search) {
-          var movies = _.filter(data.Search, function(movie) {
-            return movie.Poster !== "N/A";
+          var movies = data.Search.filter(function(movie) {
+            return movie && movie.Poster && movie.Poster !== "N/A";
           });
           // Save to cache if not yet saved
           self.database.cacheQuery(query, movies);
-          self.onFetchQuery(movies);
+          self.onFetchQuery(query, movies);
         }
       })
       .catch(function(err) {
