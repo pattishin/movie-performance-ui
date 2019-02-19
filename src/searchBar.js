@@ -28,6 +28,8 @@ SearchBar.prototype = {
       var query = response.target.value;
       var cachedQuery = self.database.fetchCachedQuery(query);
 
+      // Pass empty query to MovieList
+      // so it can reset current movie list
       if (query === "") {
         self.onFetchQuery(query);
         return;
@@ -40,7 +42,7 @@ SearchBar.prototype = {
           ? self.onFetchQuery(query, results)
           : self.searchForMovie(query);
       });
-    }, 300);
+    }, 250);
 
     search.addEventListener("keydown", handleSearch);
     search.addEventListener("search", handleSearch);

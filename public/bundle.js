@@ -1574,24 +1574,40 @@ MovieList.prototype = {
   displayList: function(query, results) {
     var movieList = document.querySelector(".MovieSearch-movieList");
     var movieTotal = document.querySelector(".MovieSearch-total");
+    var hasResults = results && !results.error && query !== "";
 
     this.resetList().then(function() {
-      if (results && !results.error && query !== "") {
+      if (hasResults) {
         movieTotal.innerHTML = "<p>" + results.length + " found</p>";
         results.forEach(function(movie, index) {
           var movieInfo = movie.Title + " " + movie.Type + " " + movie.Year;
           var movieItem = document.createElement("div");
           movieItem.setAttribute("class", "MovieSearch-movieItem");
 
-          movieItem.innerHTML =
-            '<img src="' +
-            movie.Poster +
-            '" title="' +
-            movieInfo +
-            '" alt="' +
-            movieInfo +
-            '"/>';
+          // Create new image element for movie poster
+          var movieImage = document.createElement("img");
+          movieImage.setAttribute("src", movie.Poster);
+          movieImage.setAttribute("title", movieInfo);
+          movieImage.setAttribute("alt", movieInfo);
+          movieImage.setAttribute("class", "MovieSearch-movieItem-poster");
 
+          //Create new header for movie item
+          var movieHeader = document.createElement("div");
+          movieHeader.setAttribute("class", "MovieSearch-movieItem-header");
+          movieHeader.innerHTML =
+            "<p>" +
+            movie.Title +
+            " (" +
+            movie.Year +
+            ")</p><p>" +
+            movie.Type +
+            "</p>";
+
+          // Add image/header to movie item element
+          movieItem.appendChild(movieImage);
+          movieItem.appendChild(movieHeader);
+
+          // Add movie item element to existing movie list
           movieList.appendChild(movieItem);
         });
       } else {
@@ -1656,6 +1672,8 @@ SearchBar.prototype = {
       var query = response.target.value;
       var cachedQuery = self.database.fetchCachedQuery(query);
 
+      // Pass empty query to MovieList
+      // so it can reset current movie list
       if (query === "") {
         self.onFetchQuery(query);
         return;
@@ -1668,7 +1686,7 @@ SearchBar.prototype = {
           ? self.onFetchQuery(query, results)
           : self.searchForMovie(query);
       });
-    }, 300);
+    }, 250);
 
     search.addEventListener("keydown", handleSearch);
     search.addEventListener("search", handleSearch);
