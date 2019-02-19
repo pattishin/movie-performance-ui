@@ -1,7 +1,11 @@
 # movie-performance-ui
 
-Small movie/tv show search project.
+Movie/ show search challenge
+
+## Description
 Utilizes debounce and IndexedDB to minimize calls to omdb api.
+Caching new query results into IndexedDB and re-fetching those results if user
+enters in the same query, which should help performance where connection is slow. 
 
 ## Running locally
 
