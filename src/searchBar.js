@@ -42,7 +42,7 @@ SearchBar.prototype = {
           ? self.onFetchQuery(query, results)
           : self.searchForMovie(query);
       });
-    }, 250);
+    }, 300);
 
     search.addEventListener("keydown", handleSearch);
     search.addEventListener("search", handleSearch);
