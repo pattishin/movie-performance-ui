@@ -64,7 +64,8 @@ SearchBar.prototype = {
       });
     }
 
-    var imdbAPI = "http://www.omdbapi.com/?apikey=aba065d3&s=" + query;
+    //TODO: Store apikey elsewhere (testing purposes only)
+    var imdbAPI = "http://www.omdbapi.com/?apikey=58dbd363&s=" + query;
 
     return fetch(imdbAPI, { method: "get" })
       .then(function(response) {

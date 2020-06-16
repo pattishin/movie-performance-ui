@@ -1,322 +1,288 @@
 (function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
-(function (global, factory) {
-  typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
-  typeof define === 'function' && define.amd ? define(['exports'], factory) :
-  (global = global || self, factory(global.idb = {}));
-}(this, function (exports) { 'use strict';
+'use strict';
 
-  function toArray(arr) {
-    return Array.prototype.slice.call(arr);
-  }
+Object.defineProperty(exports, '__esModule', { value: true });
 
-  function promisifyRequest(request) {
-    return new Promise(function(resolve, reject) {
-      request.onsuccess = function() {
-        resolve(request.result);
-      };
+var wrapIdbValue = require('./wrap-idb-value.js');
 
-      request.onerror = function() {
-        reject(request.error);
-      };
-    });
-  }
-
-  function promisifyRequestCall(obj, method, args) {
-    var request;
-    var p = new Promise(function(resolve, reject) {
-      request = obj[method].apply(obj, args);
-      promisifyRequest(request).then(resolve, reject);
-    });
-
-    p.request = request;
-    return p;
-  }
-
-  function promisifyCursorRequestCall(obj, method, args) {
-    var p = promisifyRequestCall(obj, method, args);
-    return p.then(function(value) {
-      if (!value) return;
-      return new Cursor(value, p.request);
-    });
-  }
-
-  function proxyProperties(ProxyClass, targetProp, properties) {
-    properties.forEach(function(prop) {
-      Object.defineProperty(ProxyClass.prototype, prop, {
-        get: function() {
-          return this[targetProp][prop];
-        },
-        set: function(val) {
-          this[targetProp][prop] = val;
-        }
-      });
-    });
-  }
-
-  function proxyRequestMethods(ProxyClass, targetProp, Constructor, properties) {
-    properties.forEach(function(prop) {
-      if (!(prop in Constructor.prototype)) return;
-      ProxyClass.prototype[prop] = function() {
-        return promisifyRequestCall(this[targetProp], prop, arguments);
-      };
-    });
-  }
-
-  function proxyMethods(ProxyClass, targetProp, Constructor, properties) {
-    properties.forEach(function(prop) {
-      if (!(prop in Constructor.prototype)) return;
-      ProxyClass.prototype[prop] = function() {
-        return this[targetProp][prop].apply(this[targetProp], arguments);
-      };
-    });
-  }
-
-  function proxyCursorRequestMethods(ProxyClass, targetProp, Constructor, properties) {
-    properties.forEach(function(prop) {
-      if (!(prop in Constructor.prototype)) return;
-      ProxyClass.prototype[prop] = function() {
-        return promisifyCursorRequestCall(this[targetProp], prop, arguments);
-      };
-    });
-  }
-
-  function Index(index) {
-    this._index = index;
-  }
-
-  proxyProperties(Index, '_index', [
-    'name',
-    'keyPath',
-    'multiEntry',
-    'unique'
-  ]);
-
-  proxyRequestMethods(Index, '_index', IDBIndex, [
-    'get',
-    'getKey',
-    'getAll',
-    'getAllKeys',
-    'count'
-  ]);
-
-  proxyCursorRequestMethods(Index, '_index', IDBIndex, [
-    'openCursor',
-    'openKeyCursor'
-  ]);
-
-  function Cursor(cursor, request) {
-    this._cursor = cursor;
-    this._request = request;
-  }
-
-  proxyProperties(Cursor, '_cursor', [
-    'direction',
-    'key',
-    'primaryKey',
-    'value'
-  ]);
-
-  proxyRequestMethods(Cursor, '_cursor', IDBCursor, [
-    'update',
-    'delete'
-  ]);
-
-  // proxy 'next' methods
-  ['advance', 'continue', 'continuePrimaryKey'].forEach(function(methodName) {
-    if (!(methodName in IDBCursor.prototype)) return;
-    Cursor.prototype[methodName] = function() {
-      var cursor = this;
-      var args = arguments;
-      return Promise.resolve().then(function() {
-        cursor._cursor[methodName].apply(cursor._cursor, args);
-        return promisifyRequest(cursor._request).then(function(value) {
-          if (!value) return;
-          return new Cursor(value, cursor._request);
+/**
+ * Open a database.
+ *
+ * @param name Name of the database.
+ * @param version Schema version.
+ * @param callbacks Additional callbacks.
+ */
+function openDB(name, version, { blocked, upgrade, blocking, terminated } = {}) {
+    const request = indexedDB.open(name, version);
+    const openPromise = wrapIdbValue.wrap(request);
+    if (upgrade) {
+        request.addEventListener('upgradeneeded', (event) => {
+            upgrade(wrapIdbValue.wrap(request.result), event.oldVersion, event.newVersion, wrapIdbValue.wrap(request.transaction));
         });
-      });
-    };
-  });
-
-  function ObjectStore(store) {
-    this._store = store;
-  }
-
-  ObjectStore.prototype.createIndex = function() {
-    return new Index(this._store.createIndex.apply(this._store, arguments));
-  };
-
-  ObjectStore.prototype.index = function() {
-    return new Index(this._store.index.apply(this._store, arguments));
-  };
-
-  proxyProperties(ObjectStore, '_store', [
-    'name',
-    'keyPath',
-    'indexNames',
-    'autoIncrement'
-  ]);
-
-  proxyRequestMethods(ObjectStore, '_store', IDBObjectStore, [
-    'put',
-    'add',
-    'delete',
-    'clear',
-    'get',
-    'getAll',
-    'getKey',
-    'getAllKeys',
-    'count'
-  ]);
-
-  proxyCursorRequestMethods(ObjectStore, '_store', IDBObjectStore, [
-    'openCursor',
-    'openKeyCursor'
-  ]);
-
-  proxyMethods(ObjectStore, '_store', IDBObjectStore, [
-    'deleteIndex'
-  ]);
-
-  function Transaction(idbTransaction) {
-    this._tx = idbTransaction;
-    this.complete = new Promise(function(resolve, reject) {
-      idbTransaction.oncomplete = function() {
-        resolve();
-      };
-      idbTransaction.onerror = function() {
-        reject(idbTransaction.error);
-      };
-      idbTransaction.onabort = function() {
-        reject(idbTransaction.error);
-      };
-    });
-  }
-
-  Transaction.prototype.objectStore = function() {
-    return new ObjectStore(this._tx.objectStore.apply(this._tx, arguments));
-  };
-
-  proxyProperties(Transaction, '_tx', [
-    'objectStoreNames',
-    'mode'
-  ]);
-
-  proxyMethods(Transaction, '_tx', IDBTransaction, [
-    'abort'
-  ]);
-
-  function UpgradeDB(db, oldVersion, transaction) {
-    this._db = db;
-    this.oldVersion = oldVersion;
-    this.transaction = new Transaction(transaction);
-  }
-
-  UpgradeDB.prototype.createObjectStore = function() {
-    return new ObjectStore(this._db.createObjectStore.apply(this._db, arguments));
-  };
-
-  proxyProperties(UpgradeDB, '_db', [
-    'name',
-    'version',
-    'objectStoreNames'
-  ]);
-
-  proxyMethods(UpgradeDB, '_db', IDBDatabase, [
-    'deleteObjectStore',
-    'close'
-  ]);
-
-  function DB(db) {
-    this._db = db;
-  }
-
-  DB.prototype.transaction = function() {
-    return new Transaction(this._db.transaction.apply(this._db, arguments));
-  };
-
-  proxyProperties(DB, '_db', [
-    'name',
-    'version',
-    'objectStoreNames'
-  ]);
-
-  proxyMethods(DB, '_db', IDBDatabase, [
-    'close'
-  ]);
-
-  // Add cursor iterators
-  // TODO: remove this once browsers do the right thing with promises
-  ['openCursor', 'openKeyCursor'].forEach(function(funcName) {
-    [ObjectStore, Index].forEach(function(Constructor) {
-      // Don't create iterateKeyCursor if openKeyCursor doesn't exist.
-      if (!(funcName in Constructor.prototype)) return;
-
-      Constructor.prototype[funcName.replace('open', 'iterate')] = function() {
-        var args = toArray(arguments);
-        var callback = args[args.length - 1];
-        var nativeObject = this._store || this._index;
-        var request = nativeObject[funcName].apply(nativeObject, args.slice(0, -1));
-        request.onsuccess = function() {
-          callback(request.result);
-        };
-      };
-    });
-  });
-
-  // polyfill getAll
-  [Index, ObjectStore].forEach(function(Constructor) {
-    if (Constructor.prototype.getAll) return;
-    Constructor.prototype.getAll = function(query, count) {
-      var instance = this;
-      var items = [];
-
-      return new Promise(function(resolve) {
-        instance.iterateCursor(query, function(cursor) {
-          if (!cursor) {
-            resolve(items);
-            return;
-          }
-          items.push(cursor.value);
-
-          if (count !== undefined && items.length == count) {
-            resolve(items);
-            return;
-          }
-          cursor.continue();
-        });
-      });
-    };
-  });
-
-  function openDb(name, version, upgradeCallback) {
-    var p = promisifyRequestCall(indexedDB, 'open', [name, version]);
-    var request = p.request;
-
-    if (request) {
-      request.onupgradeneeded = function(event) {
-        if (upgradeCallback) {
-          upgradeCallback(new UpgradeDB(request.result, event.oldVersion, request.transaction));
-        }
-      };
     }
+    if (blocked)
+        request.addEventListener('blocked', () => blocked());
+    openPromise
+        .then((db) => {
+        if (terminated)
+            db.addEventListener('close', () => terminated());
+        if (blocking)
+            db.addEventListener('versionchange', () => blocking());
+    })
+        .catch(() => { });
+    return openPromise;
+}
+/**
+ * Delete a database.
+ *
+ * @param name Name of the database.
+ */
+function deleteDB(name, { blocked } = {}) {
+    const request = indexedDB.deleteDatabase(name);
+    if (blocked)
+        request.addEventListener('blocked', () => blocked());
+    return wrapIdbValue.wrap(request).then(() => undefined);
+}
 
-    return p.then(function(db) {
-      return new DB(db);
-    });
-  }
-
-  function deleteDb(name) {
-    return promisifyRequestCall(indexedDB, 'deleteDatabase', [name]);
-  }
-
-  exports.openDb = openDb;
-  exports.deleteDb = deleteDb;
-
-  Object.defineProperty(exports, '__esModule', { value: true });
-
+const readMethods = ['get', 'getKey', 'getAll', 'getAllKeys', 'count'];
+const writeMethods = ['put', 'add', 'delete', 'clear'];
+const cachedMethods = new Map();
+function getMethod(target, prop) {
+    if (!(target instanceof IDBDatabase &&
+        !(prop in target) &&
+        typeof prop === 'string')) {
+        return;
+    }
+    if (cachedMethods.get(prop))
+        return cachedMethods.get(prop);
+    const targetFuncName = prop.replace(/FromIndex$/, '');
+    const useIndex = prop !== targetFuncName;
+    const isWrite = writeMethods.includes(targetFuncName);
+    if (
+    // Bail if the target doesn't exist on the target. Eg, getAll isn't in Edge.
+    !(targetFuncName in (useIndex ? IDBIndex : IDBObjectStore).prototype) ||
+        !(isWrite || readMethods.includes(targetFuncName))) {
+        return;
+    }
+    const method = async function (storeName, ...args) {
+        // isWrite ? 'readwrite' : undefined gzipps better, but fails in Edge :(
+        const tx = this.transaction(storeName, isWrite ? 'readwrite' : 'readonly');
+        let target = tx.store;
+        if (useIndex)
+            target = target.index(args.shift());
+        const returnVal = await target[targetFuncName](...args);
+        if (isWrite)
+            await tx.done;
+        return returnVal;
+    };
+    cachedMethods.set(prop, method);
+    return method;
+}
+wrapIdbValue.replaceTraps((oldTraps) => ({
+    ...oldTraps,
+    get: (target, prop, receiver) => getMethod(target, prop) || oldTraps.get(target, prop, receiver),
+    has: (target, prop) => !!getMethod(target, prop) || oldTraps.has(target, prop),
 }));
 
-},{}],2:[function(require,module,exports){
+exports.unwrap = wrapIdbValue.unwrap;
+exports.wrap = wrapIdbValue.wrap;
+exports.deleteDB = deleteDB;
+exports.openDB = openDB;
+
+},{"./wrap-idb-value.js":2}],2:[function(require,module,exports){
+'use strict';
+
+const instanceOfAny = (object, constructors) => constructors.some((c) => object instanceof c);
+
+let idbProxyableTypes;
+let cursorAdvanceMethods;
+// This is a function to prevent it throwing up in node environments.
+function getIdbProxyableTypes() {
+    return (idbProxyableTypes ||
+        (idbProxyableTypes = [
+            IDBDatabase,
+            IDBObjectStore,
+            IDBIndex,
+            IDBCursor,
+            IDBTransaction,
+        ]));
+}
+// This is a function to prevent it throwing up in node environments.
+function getCursorAdvanceMethods() {
+    return (cursorAdvanceMethods ||
+        (cursorAdvanceMethods = [
+            IDBCursor.prototype.advance,
+            IDBCursor.prototype.continue,
+            IDBCursor.prototype.continuePrimaryKey,
+        ]));
+}
+const cursorRequestMap = new WeakMap();
+const transactionDoneMap = new WeakMap();
+const transactionStoreNamesMap = new WeakMap();
+const transformCache = new WeakMap();
+const reverseTransformCache = new WeakMap();
+function promisifyRequest(request) {
+    const promise = new Promise((resolve, reject) => {
+        const unlisten = () => {
+            request.removeEventListener('success', success);
+            request.removeEventListener('error', error);
+        };
+        const success = () => {
+            resolve(wrap(request.result));
+            unlisten();
+        };
+        const error = () => {
+            reject(request.error);
+            unlisten();
+        };
+        request.addEventListener('success', success);
+        request.addEventListener('error', error);
+    });
+    promise
+        .then((value) => {
+        // Since cursoring reuses the IDBRequest (*sigh*), we cache it for later retrieval
+        // (see wrapFunction).
+        if (value instanceof IDBCursor) {
+            cursorRequestMap.set(value, request);
+        }
+        // Catching to avoid "Uncaught Promise exceptions"
+    })
+        .catch(() => { });
+    // This mapping exists in reverseTransformCache but doesn't doesn't exist in transformCache. This
+    // is because we create many promises from a single IDBRequest.
+    reverseTransformCache.set(promise, request);
+    return promise;
+}
+function cacheDonePromiseForTransaction(tx) {
+    // Early bail if we've already created a done promise for this transaction.
+    if (transactionDoneMap.has(tx))
+        return;
+    const done = new Promise((resolve, reject) => {
+        const unlisten = () => {
+            tx.removeEventListener('complete', complete);
+            tx.removeEventListener('error', error);
+            tx.removeEventListener('abort', error);
+        };
+        const complete = () => {
+            resolve();
+            unlisten();
+        };
+        const error = () => {
+            reject(tx.error || new DOMException('AbortError', 'AbortError'));
+            unlisten();
+        };
+        tx.addEventListener('complete', complete);
+        tx.addEventListener('error', error);
+        tx.addEventListener('abort', error);
+    });
+    // Cache it for later retrieval.
+    transactionDoneMap.set(tx, done);
+}
+let idbProxyTraps = {
+    get(target, prop, receiver) {
+        if (target instanceof IDBTransaction) {
+            // Special handling for transaction.done.
+            if (prop === 'done')
+                return transactionDoneMap.get(target);
+            // Polyfill for objectStoreNames because of Edge.
+            if (prop === 'objectStoreNames') {
+                return target.objectStoreNames || transactionStoreNamesMap.get(target);
+            }
+            // Make tx.store return the only store in the transaction, or undefined if there are many.
+            if (prop === 'store') {
+                return receiver.objectStoreNames[1]
+                    ? undefined
+                    : receiver.objectStore(receiver.objectStoreNames[0]);
+            }
+        }
+        // Else transform whatever we get back.
+        return wrap(target[prop]);
+    },
+    set(target, prop, value) {
+        target[prop] = value;
+        return true;
+    },
+    has(target, prop) {
+        if (target instanceof IDBTransaction &&
+            (prop === 'done' || prop === 'store')) {
+            return true;
+        }
+        return prop in target;
+    },
+};
+function replaceTraps(callback) {
+    idbProxyTraps = callback(idbProxyTraps);
+}
+function wrapFunction(func) {
+    // Due to expected object equality (which is enforced by the caching in `wrap`), we
+    // only create one new func per func.
+    // Edge doesn't support objectStoreNames (booo), so we polyfill it here.
+    if (func === IDBDatabase.prototype.transaction &&
+        !('objectStoreNames' in IDBTransaction.prototype)) {
+        return function (storeNames, ...args) {
+            const tx = func.call(unwrap(this), storeNames, ...args);
+            transactionStoreNamesMap.set(tx, storeNames.sort ? storeNames.sort() : [storeNames]);
+            return wrap(tx);
+        };
+    }
+    // Cursor methods are special, as the behaviour is a little more different to standard IDB. In
+    // IDB, you advance the cursor and wait for a new 'success' on the IDBRequest that gave you the
+    // cursor. It's kinda like a promise that can resolve with many values. That doesn't make sense
+    // with real promises, so each advance methods returns a new promise for the cursor object, or
+    // undefined if the end of the cursor has been reached.
+    if (getCursorAdvanceMethods().includes(func)) {
+        return function (...args) {
+            // Calling the original function with the proxy as 'this' causes ILLEGAL INVOCATION, so we use
+            // the original object.
+            func.apply(unwrap(this), args);
+            return wrap(cursorRequestMap.get(this));
+        };
+    }
+    return function (...args) {
+        // Calling the original function with the proxy as 'this' causes ILLEGAL INVOCATION, so we use
+        // the original object.
+        return wrap(func.apply(unwrap(this), args));
+    };
+}
+function transformCachableValue(value) {
+    if (typeof value === 'function')
+        return wrapFunction(value);
+    // This doesn't return, it just creates a 'done' promise for the transaction,
+    // which is later returned for transaction.done (see idbObjectHandler).
+    if (value instanceof IDBTransaction)
+        cacheDonePromiseForTransaction(value);
+    if (instanceOfAny(value, getIdbProxyableTypes()))
+        return new Proxy(value, idbProxyTraps);
+    // Return the same value back if we're not going to transform it.
+    return value;
+}
+function wrap(value) {
+    // We sometimes generate multiple promises from a single IDBRequest (eg when cursoring), because
+    // IDB is weird and a single IDBRequest can yield many responses, so these can't be cached.
+    if (value instanceof IDBRequest)
+        return promisifyRequest(value);
+    // If we've already transformed this value before, reuse the transformed value.
+    // This is faster, but it also provides object equality.
+    if (transformCache.has(value))
+        return transformCache.get(value);
+    const newValue = transformCachableValue(value);
+    // Not all types are transformed.
+    // These may be primitive types, so they can't be WeakMap keys.
+    if (newValue !== value) {
+        transformCache.set(value, newValue);
+        reverseTransformCache.set(newValue, value);
+    }
+    return newValue;
+}
+const unwrap = (value) => reverseTransformCache.get(value);
+
+exports.instanceOfAny = instanceOfAny;
+exports.replaceTraps = replaceTraps;
+exports.reverseTransformCache = reverseTransformCache;
+exports.unwrap = unwrap;
+exports.wrap = wrap;
+
+},{}],3:[function(require,module,exports){
 // shim for using process in browser
 var process = module.exports = {};
 
@@ -502,7 +468,7 @@ process.chdir = function (dir) {
 };
 process.umask = function() { return 0; };
 
-},{}],3:[function(require,module,exports){
+},{}],4:[function(require,module,exports){
 (function (setImmediate){
 'use strict';
 
@@ -513,12 +479,15 @@ function finallyConstructor(callback) {
   var constructor = this.constructor;
   return this.then(
     function(value) {
+      // @ts-ignore
       return constructor.resolve(callback()).then(function() {
         return value;
       });
     },
     function(reason) {
+      // @ts-ignore
       return constructor.resolve(callback()).then(function() {
+        // @ts-ignore
         return constructor.reject(reason);
       });
     }
@@ -528,6 +497,10 @@ function finallyConstructor(callback) {
 // Store setTimeout reference so promise-polyfill will be unaffected by
 // other code modifying setTimeout (like sinon.useFakeTimers())
 var setTimeoutFunc = setTimeout;
+
+function isArray(x) {
+  return Boolean(x && typeof x.length !== 'undefined');
+}
 
 function noop() {}
 
@@ -686,8 +659,10 @@ Promise.prototype['finally'] = finallyConstructor;
 
 Promise.all = function(arr) {
   return new Promise(function(resolve, reject) {
-    if (!arr || typeof arr.length === 'undefined')
-      throw new TypeError('Promise.all accepts an array');
+    if (!isArray(arr)) {
+      return reject(new TypeError('Promise.all accepts an array'));
+    }
+
     var args = Array.prototype.slice.call(arr);
     if (args.length === 0) return resolve([]);
     var remaining = args.length;
@@ -738,18 +713,24 @@ Promise.reject = function(value) {
   });
 };
 
-Promise.race = function(values) {
+Promise.race = function(arr) {
   return new Promise(function(resolve, reject) {
-    for (var i = 0, len = values.length; i < len; i++) {
-      values[i].then(resolve, reject);
+    if (!isArray(arr)) {
+      return reject(new TypeError('Promise.race accepts an array'));
+    }
+
+    for (var i = 0, len = arr.length; i < len; i++) {
+      Promise.resolve(arr[i]).then(resolve, reject);
     }
   });
 };
 
 // Use polyfill for setImmediate for performance gains
 Promise._immediateFn =
+  // @ts-ignore
   (typeof setImmediate === 'function' &&
     function(fn) {
+      // @ts-ignore
       setImmediate(fn);
     }) ||
   function(fn) {
@@ -765,7 +746,7 @@ Promise._unhandledRejectionFn = function _unhandledRejectionFn(err) {
 module.exports = Promise;
 
 }).call(this,require("timers").setImmediate)
-},{"timers":4}],4:[function(require,module,exports){
+},{"timers":5}],5:[function(require,module,exports){
 (function (setImmediate,clearImmediate){
 var nextTick = require('process/browser.js').nextTick;
 var apply = Function.prototype.apply;
@@ -844,7 +825,7 @@ exports.clearImmediate = typeof clearImmediate === "function" ? clearImmediate :
   delete immediateIds[id];
 };
 }).call(this,require("timers").setImmediate,require("timers").clearImmediate)
-},{"process/browser.js":2,"timers":4}],5:[function(require,module,exports){
+},{"process/browser.js":3,"timers":5}],6:[function(require,module,exports){
 (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
   typeof define === 'function' && define.amd ? define(['exports'], factory) :
@@ -1377,7 +1358,7 @@ exports.clearImmediate = typeof clearImmediate === "function" ? clearImmediate :
 
 })));
 
-},{}],6:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
 /**
  * Modified debounce function from
  * https://davidwalsh.name/javascript-debounce-function
@@ -1403,7 +1384,7 @@ function debounce(func, wait) {
 
 module.exports = debounce;
 
-},{}],7:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 "use strict";
 
 var idb = require("idb");
@@ -1433,7 +1414,7 @@ IdbConnection.prototype = {
 
     var self = this;
     var dbPromise = idb
-      .openDb("movie-search-db", 1, function(db) {
+      .openDB("movie-search-db", 1, function(db) {
         if (!db.objectStoreNames.contains(self.storeName)) {
           db.createObjectStore(self.storeName);
         }
@@ -1509,7 +1490,7 @@ IdbConnection.prototype = {
 
 module.exports = IdbConnection;
 
-},{"idb":1}],8:[function(require,module,exports){
+},{"idb":1}],9:[function(require,module,exports){
 "use strict";
 
 var IdbConnection = require("./idbConnection.js");
@@ -1539,7 +1520,7 @@ if (!window.Promise) {
   });
 })();
 
-},{"./idbConnection.js":7,"./movieList.js":9,"./searchBar.js":10,"promise-polyfill":3,"whatwg-fetch":5}],9:[function(require,module,exports){
+},{"./idbConnection.js":8,"./movieList.js":10,"./searchBar.js":11,"promise-polyfill":4,"whatwg-fetch":6}],10:[function(require,module,exports){
 "use strict";
 /**
  * @module MovieList
@@ -1641,7 +1622,7 @@ MovieList.prototype = {
 
 module.exports = MovieList;
 
-},{}],10:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 "use strict";
 
 var debounce = require("./helpers.js");
@@ -1686,7 +1667,7 @@ SearchBar.prototype = {
           ? self.onFetchQuery(query, results)
           : self.searchForMovie(query);
       });
-    }, 250);
+    }, 300);
 
     search.addEventListener("keydown", handleSearch);
     search.addEventListener("search", handleSearch);
@@ -1708,7 +1689,8 @@ SearchBar.prototype = {
       });
     }
 
-    var imdbAPI = "http://www.omdbapi.com/?apikey=aba065d3&s=" + query;
+    //TODO: Store apikey elsewhere (testing purposes only)
+    var imdbAPI = "http://www.omdbapi.com/?apikey=58dbd363&s=" + query;
 
     return fetch(imdbAPI, { method: "get" })
       .then(function(response) {
@@ -1732,4 +1714,4 @@ SearchBar.prototype = {
 
 module.exports = SearchBar;
 
-},{"./helpers.js":6}]},{},[8]);
+},{"./helpers.js":7}]},{},[9]);

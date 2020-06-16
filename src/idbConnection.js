@@ -27,7 +27,7 @@ IdbConnection.prototype = {
 
     var self = this;
     var dbPromise = idb
-      .openDb("movie-search-db", 1, function(db) {
+      .openDB("movie-search-db", 1, function(db) {
         if (!db.objectStoreNames.contains(self.storeName)) {
           db.createObjectStore(self.storeName);
         }
